@@ -1,0 +1,1212 @@
+{
+  "datasets": [
+    {
+      "name": "796c2a7a",
+      "displayName": "dim_calendar",
+      "config": {
+        "version": "1.1",
+        "source": "happy_family_homestay.gold.dim_calendar",
+        "dimensions": [
+          {
+            "expr": "source.*"
+          }
+        ],
+        "measures": [
+          {
+            "name": "count",
+            "expr": "COUNT(*)",
+            "comment": "Represents the total number of rows in the dataset. Use this measure to count all",
+            "displayName": "Count"
+          }
+        ]
+      }
+    },
+    {
+      "name": "836cd43a",
+      "displayName": "fact_booking",
+      "config": {
+        "version": "1.1",
+        "source": "happy_family_homestay.gold.fact_booking",
+        "dimensions": [
+          {
+            "expr": "source.*"
+          }
+        ],
+        "measures": [
+          {
+            "name": "count",
+            "expr": "COUNT(*)",
+            "comment": "Represents the total number of rows in the dataset. Use this measure to count all",
+            "displayName": "Count"
+          },
+          {
+            "name": "revenue_total",
+            "expr": "SUM(source.total_revenue)",
+            "displayName": "Total Pendapatan",
+            "format": {
+              "type": "currency",
+              "currencyCode": "IDR",
+              "abbreviation": "compact"
+            }
+          },
+          {
+            "name": "stay_nights_total",
+            "expr": "SUM(source.stay_nights)",
+            "displayName": "Total Malam Menginap"
+          },
+          {
+            "displayName": "ALOS (Rata-rata Lama Menginap)",
+            "format": {
+              "type": "number",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 1.0
+              }
+            },
+            "name": "alos",
+            "expr": "SUM(source.stay_nights) / NULLIF(COUNT(*), 0)",
+            "comment": "Rata-rata malam menginap per booking"
+          }
+        ]
+      }
+    },
+    {
+      "name": "db88a68a",
+      "displayName": "fact_daily_stay",
+      "config": {
+        "version": "1.1",
+        "source": "SELECT\n    s.daily_stay_id,\n    s.booking_id,\n    s.stay_date,\n    s.guest_count,\n    s.total_rooms_booked,\n    s.daily_revenue,\n    COALESCE(b.visiting_purpose, 'Unknown') AS visiting_purpose\nFROM happy_family_homestay.gold.fact_daily_stay AS s\nLEFT JOIN happy_family_homestay.gold.fact_booking AS b\n    ON s.booking_id = b.booking_id",
+        "dimensions": [
+          {
+            "expr": "source.*"
+          }
+        ],
+        "measures": [
+          {
+            "name": "count",
+            "expr": "COUNT(*)",
+            "comment": "Represents the total number of rows in the dataset. Use this measure to count all",
+            "displayName": "Count"
+          }
+        ]
+      }
+    },
+    {
+      "name": "kpi_daily_homestay",
+      "displayName": "KPI Harian Homestay",
+      "config": {
+        "version": "1.1",
+        "source": "SELECT\n    c.date AS stay_date,\n    c.day_of_week,\n    c.is_weekend,\n    c.year_month,\n    p.visiting_purpose,\n    COALESCE(f.rooms_booked, 0) AS rooms_booked,\n    COALESCE(f.daily_revenue, 0) AS daily_revenue\nFROM happy_family_homestay.gold.dim_calendar AS c\nLEFT JOIN (\n    SELECT DISTINCT COALESCE(visiting_purpose, 'Unknown') AS visiting_purpose\n    FROM happy_family_homestay.gold.fact_booking\n) AS p\n    ON TRUE\nLEFT JOIN (\n    SELECT\n        s.stay_date,\n        COALESCE(b.visiting_purpose, 'Unknown') AS visiting_purpose,\n        SUM(s.total_rooms_booked) AS rooms_booked,\n        SUM(s.daily_revenue)      AS daily_revenue\n    FROM happy_family_homestay.gold.fact_daily_stay AS s\n    LEFT JOIN happy_family_homestay.gold.fact_booking AS b\n        ON s.booking_id = b.booking_id\n    GROUP BY s.stay_date, COALESCE(b.visiting_purpose, 'Unknown')\n) AS f\n    ON c.date = f.stay_date AND p.visiting_purpose = f.visiting_purpose",
+        "dimensions": [
+          {
+            "name": "stay_date",
+            "expr": "source.stay_date",
+            "comment": "Tanggal menginap; satu baris per tanggal kalender, termasuk hari tanpa booking"
+          },
+          {
+            "name": "year_month",
+            "expr": "source.year_month"
+          },
+          {
+            "name": "day_of_week",
+            "expr": "source.day_of_week"
+          },
+          {
+            "name": "day_of_week_ordered",
+            "expr": "CASE source.day_of_week WHEN 'Monday' THEN '1. Senin' WHEN 'Tuesday' THEN '2. Selasa' WHEN 'Wednesday' THEN '3. Rabu' WHEN 'Thursday' THEN '4. Kamis' WHEN 'Friday' THEN '5. Jumat' WHEN 'Saturday' THEN '6. Sabtu' WHEN 'Sunday' THEN '7. Minggu' END",
+            "comment": "Hari dalam seminggu, diurutkan Senin sampai Minggu"
+          },
+          {
+            "name": "is_weekend",
+            "expr": "source.is_weekend"
+          },
+          {
+            "name": "visiting_purpose",
+            "expr": "source.visiting_purpose",
+            "comment": "Tujuan kunjungan tamu; memungkinkan filter KPI harian per tujuan kunjungan"
+          }
+        ],
+        "measures": [
+          {
+            "name": "rooms_sold",
+            "expr": "SUM(source.rooms_booked)",
+            "displayName": "Kamar Terjual"
+          },
+          {
+            "name": "room_revenue",
+            "expr": "SUM(source.daily_revenue)",
+            "displayName": "Pendapatan Kamar",
+            "format": {
+              "type": "currency",
+              "currencyCode": "IDR",
+              "abbreviation": "compact"
+            }
+          },
+          {
+            "displayName": "ADR (Average Daily Rate)",
+            "format": {
+              "type": "currency",
+              "currencyCode": "IDR",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 0.0
+              }
+            },
+            "name": "adr",
+            "expr": "SUM(source.daily_revenue) / NULLIF(SUM(source.rooms_booked), 0)",
+            "comment": "Pendapatan kamar dibagi jumlah kamar terjual (room equivalents)"
+          },
+          {
+            "displayName": "Occupancy",
+            "format": {
+              "type": "percentage",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 1.0
+              }
+            },
+            "name": "occupancy",
+            "expr": "SUM(source.rooms_booked) / NULLIF(7 * COUNT(DISTINCT source.stay_date), 0)",
+            "comment": "Room-nights terjual dibagi kapasitas 7 room equivalents per hari"
+          },
+          {
+            "displayName": "RevPAR",
+            "format": {
+              "type": "currency",
+              "currencyCode": "IDR",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 0.0
+              }
+            },
+            "name": "revpar",
+            "expr": "SUM(source.daily_revenue) / NULLIF(7 * COUNT(DISTINCT source.stay_date), 0)",
+            "comment": "Pendapatan kamar dibagi room-nights tersedia (kapasitas 7)"
+          },
+          {
+            "name": "available_room_nights",
+            "expr": "7 * COUNT(DISTINCT source.stay_date)",
+            "displayName": "Room-Nights Tersedia"
+          }
+        ]
+      }
+    }
+  ],
+  "pages": [
+    {
+      "name": "2fe5c394",
+      "displayName": "Monthly Performance",
+      "layout": [
+        {
+          "widget": {
+            "name": "kpi_occupancy",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "kpi_daily_homestay",
+                  "fields": [
+                    {
+                      "name": "measure(occupancy)",
+                      "expression": "MEASURE(`occupancy`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "showDescription": false,
+                "title": {
+                  "value": "Occupancy (Tingkat Hunian)",
+                  "fields": []
+                },
+                "description": {
+                  "value": "",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(occupancy)",
+                  "rowNumber": 0,
+                  "style": {
+                    "fontSize": 24
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 2,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_adr",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "kpi_daily_homestay",
+                  "fields": [
+                    {
+                      "name": "measure(adr)",
+                      "expression": "MEASURE(`adr`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "showDescription": false,
+                "title": {
+                  "value": "ADR (Rata-rata Harga Harian Terjual)",
+                  "fields": []
+                },
+                "description": {
+                  "value": "",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(adr)",
+                  "rowNumber": 0,
+                  "style": {
+                    "fontSize": 24
+                  },
+                  "format": {
+                    "type": "number-currency",
+                    "currencyCode": "IDR",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 1
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 2,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_revpar",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "kpi_daily_homestay",
+                  "fields": [
+                    {
+                      "name": "measure(revpar)",
+                      "expression": "MEASURE(`revpar`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "showDescription": false,
+                "title": {
+                  "value": "RevPAR (Pendapatan/Kamar Tersedia)",
+                  "fields": []
+                },
+                "description": {
+                  "value": "",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(revpar)",
+                  "rowNumber": 0,
+                  "style": {
+                    "fontSize": 24
+                  },
+                  "format": {
+                    "type": "number-currency",
+                    "currencyCode": "IDR",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 1
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 2,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_alos",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "836cd43a",
+                  "fields": [
+                    {
+                      "name": "measure(alos)",
+                      "expression": "MEASURE(`alos`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "showDescription": false,
+                "title": {
+                  "value": "ALOS (Rata-rata Lama Menginap)",
+                  "fields": []
+                },
+                "description": {
+                  "value": "",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(alos)",
+                  "rowNumber": 0,
+                  "style": {
+                    "fontSize": 24
+                  },
+                  "format": {
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "places": 1,
+                      "type": "exact"
+                    },
+                    "type": "number-plain"
+                  },
+                  "formatTemplate": "{{ @formatted }} Malam"
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 10,
+            "y": 2,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "daily_revenue_trend",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "kpi_daily_homestay",
+                  "fields": [
+                    {
+                      "name": "stay_date",
+                      "expression": "`stay_date`"
+                    },
+                    {
+                      "name": "measure(room_revenue)",
+                      "expression": "MEASURE(`room_revenue`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "showDescription": true,
+                "title": {
+                  "value": "Tren Pendapatan Harian",
+                  "fields": []
+                },
+                "description": {
+                  "value": "Pendapatan kamar per tanggal menginap; hari tanpa booking ditampilkan sebagai nol.",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "mark": {
+                "lineShape": "linear",
+                "colors": [
+                  "#5B7C99"
+                ]
+              },
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "stay_date",
+                  "displayName": "Tanggal",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "measure(room_revenue)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
+                  "displayName": "Pendapatan",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "label": {
+                  "show": true,
+                  "display": {
+                    "type": "y-max"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 4,
+            "width": 12,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_total_revenue",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "kpi_daily_homestay",
+                  "fields": [
+                    {
+                      "name": "measure(room_revenue)",
+                      "expression": "MEASURE(`room_revenue`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "showDescription": false,
+                "title": "Total Revenue (Pendapatan)",
+                "description": {
+                  "value": "",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(room_revenue)",
+                  "rowNumber": 0,
+                  "style": {
+                    "fontSize": 24
+                  },
+                  "format": {
+                    "type": "number-currency",
+                    "currencyCode": "IDR",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 1
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "f2c95511",
+            "imageSpec": {
+              "image": {
+                "source": {
+                  "url": "https://dbc-df84959c-1861.cloud.databricks.com/ajax-api/2.0/workspace/export?path=/Users/farisriski86%40gmail.com/Happy%20Family%20Logo%20small.jpg&direct_download=true&format=AUTO&o=7474653640322440"
+                },
+                "altText": "Logo Happy Family Homestay"
+              },
+              "frame": {
+                "showTitle": false
+              },
+              "style": {
+                "sizeMode": "SIZE_MODE_FIT",
+                "horizontalAlign": "HORIZONTAL_ALIGN_CENTER",
+                "verticalAlign": "VERTICAL_ALIGN_CENTER"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "revenue_by_visiting_purpose",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "kpi_daily_homestay",
+                  "fields": [
+                    {
+                      "name": "measure(room_revenue)",
+                      "expression": "MEASURE(`room_revenue`)"
+                    },
+                    {
+                      "name": "visiting_purpose",
+                      "expression": "`visiting_purpose`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "showDescription": true,
+                "title": {
+                  "value": "Pendapatan per Tujuan Kunjungan",
+                  "fields": []
+                },
+                "description": {
+                  "fields": [],
+                  "value": "Pendapatan kamar per tujuan kunjungan tamu."
+                }
+              },
+              "version": 3,
+              "widgetType": "pie",
+              "encodings": {
+                "angle": {
+                  "fieldName": "measure(room_revenue)",
+                  "format": {
+                    "abbreviation": "compact",
+                    "currencyCode": "IDR",
+                    "decimalPlaces": {
+                      "places": 1,
+                      "type": "max"
+                    },
+                    "type": "number-currency"
+                  },
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "axis": {
+                    "hideTitle": true
+                  },
+                  "displayName": "Pendapatan"
+                },
+                "color": {
+                  "fieldName": "visiting_purpose",
+                  "legend": {
+                    "hide": false,
+                    "hideTitle": true,
+                    "position": "right"
+                  },
+                  "displayName": "Tujuan Kunjungan",
+                  "scale": {
+                    "sort": {
+                      "by": "angle-reversed"
+                    },
+                    "type": "categorical",
+                    "mappings": [
+                      {
+                        "color": "#2B3A59",
+                        "value": "Liburan"
+                      },
+                      {
+                        "color": "#5B7C99",
+                        "value": "Bekerja"
+                      }
+                    ]
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 7,
+            "y": 10,
+            "width": 5,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "b137308d",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "db88a68a",
+                  "fields": [
+                    {
+                      "name": "daily_stay_id",
+                      "expression": "`daily_stay_id`"
+                    },
+                    {
+                      "name": "booking_id",
+                      "expression": "`booking_id`"
+                    },
+                    {
+                      "name": "guest_count",
+                      "expression": "`guest_count`"
+                    },
+                    {
+                      "name": "daily_revenue",
+                      "expression": "`daily_revenue`"
+                    },
+                    {
+                      "name": "stay_date",
+                      "expression": "`stay_date`"
+                    },
+                    {
+                      "name": "total_rooms_booked",
+                      "expression": "`total_rooms_booked`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showDescription": false,
+                "showTitle": true,
+                "title": "Detail Menginap Harian",
+                "description": {
+                  "fields": [],
+                  "value": ""
+                }
+              },
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "daily_stay_id"
+                  },
+                  {
+                    "fieldName": "booking_id"
+                  },
+                  {
+                    "fieldName": "guest_count"
+                  },
+                  {
+                    "fieldName": "daily_revenue"
+                  },
+                  {
+                    "fieldName": "stay_date"
+                  },
+                  {
+                    "fieldName": "total_rooms_booked"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 15,
+            "width": 12,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "a1eb24bc",
+            "multilineTextboxSpec": {
+              "lines": [
+                "# <span style=\"font-size: 36px;line-height: 1.5;\">Happy Family Homestay Performance</span>"
+              ]
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 0,
+            "width": 6,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "created_at_date_filter",
+            "queries": [
+              {
+                "name": "dashboards/01f1d4f7817c186baaea0f815f804308/datasets/01f1d4f969721ca6a97fe363f3231447_stay_date",
+                "query": {
+                  "datasetName": "kpi_daily_homestay",
+                  "fields": [
+                    {
+                      "name": "stay_date",
+                      "expression": "`stay_date`"
+                    },
+                    {
+                      "name": "stay_date_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1d4f7817c186baaea0f815f804308/datasets/01f1d4f796961c758312a99ee98ab5f9_check_in",
+                "query": {
+                  "datasetName": "836cd43a",
+                  "fields": [
+                    {
+                      "name": "check_in",
+                      "expression": "`check_in`"
+                    },
+                    {
+                      "name": "check_in_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "selection": {
+                "defaultSelection": {
+                  "range": {
+                    "dataType": "DATE",
+                    "min": {
+                      "value": "2026-09-01T00:00:00.000"
+                    },
+                    "max": {
+                      "value": "2026-09-30T23:59:59.999"
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showDescription": false,
+                "showTitle": true,
+                "title": {
+                  "value": "Periode Menginap",
+                  "fields": []
+                },
+                "description": {
+                  "fields": [],
+                  "value": ""
+                }
+              },
+              "widgetType": "filter-date-range-picker",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "stay_date",
+                    "queryName": "dashboards/01f1d4f7817c186baaea0f815f804308/datasets/01f1d4f969721ca6a97fe363f3231447_stay_date"
+                  },
+                  {
+                    "fieldName": "check_in",
+                    "queryName": "dashboards/01f1d4f7817c186baaea0f815f804308/datasets/01f1d4f796961c758312a99ee98ab5f9_check_in"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 0,
+            "width": 4,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_total_booking",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "836cd43a",
+                  "fields": [
+                    {
+                      "name": "measure(count)",
+                      "expression": "MEASURE(`count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Total Booking (Pemesanan)",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(count)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 2,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "visiting_purpose_filter",
+            "queries": [
+              {
+                "name": "dashboards/01f1d4f7817c186baaea0f815f804308/datasets/01f1d4f796961c758312a99ee98ab5f9_visiting_purpose",
+                "query": {
+                  "datasetName": "836cd43a",
+                  "fields": [
+                    {
+                      "name": "visiting_purpose",
+                      "expression": "`visiting_purpose`"
+                    },
+                    {
+                      "name": "visiting_purpose_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1d4f7817c186baaea0f815f804308/datasets/01f1d4f969721ca6a97fe363f3231447_visiting_purpose",
+                "query": {
+                  "datasetName": "kpi_daily_homestay",
+                  "fields": [
+                    {
+                      "name": "visiting_purpose",
+                      "expression": "`visiting_purpose`"
+                    },
+                    {
+                      "name": "visiting_purpose_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1d4f7817c186baaea0f815f804308/datasets/01f1d4f796dd141ca2ca0483c3ee30b9_visiting_purpose",
+                "query": {
+                  "datasetName": "db88a68a",
+                  "fields": [
+                    {
+                      "name": "visiting_purpose",
+                      "expression": "`visiting_purpose`"
+                    },
+                    {
+                      "name": "visiting_purpose_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showDescription": false,
+                "showTitle": true,
+                "title": {
+                  "value": "Tujuan Kunjungan",
+                  "fields": []
+                }
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "visiting_purpose",
+                    "queryName": "dashboards/01f1d4f7817c186baaea0f815f804308/datasets/01f1d4f796961c758312a99ee98ab5f9_visiting_purpose"
+                  },
+                  {
+                    "fieldName": "visiting_purpose",
+                    "queryName": "dashboards/01f1d4f7817c186baaea0f815f804308/datasets/01f1d4f969721ca6a97fe363f3231447_visiting_purpose"
+                  },
+                  {
+                    "fieldName": "visiting_purpose",
+                    "queryName": "dashboards/01f1d4f7817c186baaea0f815f804308/datasets/01f1d4f796dd141ca2ca0483c3ee30b9_visiting_purpose"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 1,
+            "width": 4,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "dc89ee78",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "836cd43a",
+                  "fields": [
+                    {
+                      "name": "acquisition_channel",
+                      "expression": "`acquisition_channel`"
+                    },
+                    {
+                      "name": "measure(count)",
+                      "expression": "MEASURE(`count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showDescription": true,
+                "showTitle": true,
+                "title": {
+                  "value": "Pemesanan per Kanal Akuisisi",
+                  "fields": []
+                },
+                "description": {
+                  "value": "Jumlah pemesanan per kanal akuisisi tamu.",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "acquisition_channel",
+                  "displayName": "Kanal Akuisisi",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "y-reversed"
+                    }
+                  }
+                },
+                "y": {
+                  "fieldName": "measure(count)",
+                  "format": {
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "places": 0,
+                      "type": "exact"
+                    },
+                    "type": "number-plain"
+                  },
+                  "displayName": "Pemesanan",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "acquisition_channel",
+                  "legend": {
+                    "hide": true,
+                    "hideTitle": true,
+                    "position": "top"
+                  },
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 10,
+            "width": 7,
+            "height": 5
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "global_filters",
+      "displayName": "Global Filters",
+      "pageType": "PAGE_TYPE_GLOBAL_FILTERS",
+      "layoutVersion": "GRID_V1"
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "canvasBackgroundColor": {
+        "light": "#EDE6D4",
+        "dark": "#10201F"
+      },
+      "widgetBackgroundColor": {
+        "light": "#FAF7EE",
+        "dark": "#1C2E2C"
+      },
+      "widgetBorderColor": {
+        "light": "#FAF7EE",
+        "dark": "#1C2E2C"
+      },
+      "fontColor": {
+        "light": "#11171C",
+        "dark": "#E8ECF0"
+      },
+      "selectionColor": {
+        "light": "#0F766E",
+        "dark": "#2DD4BF"
+      },
+      "visualizationColors": [
+        "#134E4A",
+        "#0F766E",
+        "#0D9488",
+        "#2DD4BF",
+        "#456D69"
+      ],
+      "widgetHeaderAlignment": "LEFT",
+      "widgetPadding": 12,
+      "widgetCornerRadius": 12,
+      "widgetShadow": 10,
+      "fontSettings": {
+        "base": {
+          "fontFamily": "Inter",
+          "fontColor": {
+            "light": "#0F3B3A",
+            "dark": "#CFE3DE"
+          },
+          "fontSize": 13,
+          "fontWeight": 400
+        },
+        "widgetTitle": {
+          "fontFamily": "Inter",
+          "fontColor": {
+            "light": "#0F3B3A",
+            "dark": "#CFE3DE"
+          },
+          "fontSize": 14,
+          "fontWeight": 600
+        },
+        "fieldValue": {
+          "fontFamily": "Inter",
+          "fontColor": {
+            "light": "#43605B",
+            "dark": "#A8C6C0"
+          },
+          "fontSize": 12
+        }
+      },
+      "gridLineColor": {
+        "light": "#E0D9C6",
+        "dark": "#2B3B38"
+      },
+      "axisLineColor": {
+        "light": "#BFB395",
+        "dark": "#3F534F"
+      }
+    },
+    "applyModeEnabled": false
+  }
+}
