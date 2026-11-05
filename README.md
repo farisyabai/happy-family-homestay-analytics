@@ -194,5 +194,5 @@ happy-family-homestay-analytics/
 ## Contact
 
 - Author: Faris Riski
-- LinkedIn: [farisriski86](https://www.linkedin.com/in/farisriski86/)
+- LinkedIn: [Faris Riski](https://www.linkedin.com/in/farisriski86/)
 - Email: farisriski86@gmail.com
